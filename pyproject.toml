@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "acft"
+version = "0.1.0"
+description = "ACFT – Adaptive Cognitive Field Theory engine for stabilizing LLM reasoning (Ollama-ready)."
+authors = [
+  { name = "Izharuddin Khan", email = "ik2019dec@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "requests>=2.31",
+    "pydantic>=1.10,<2.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/AdaptiveCognitiveFieldTheory"
+
+[project.scripts]
+acft = "acft.cli:main"
+
+[tool.setuptools]
+packages = ["acft"]

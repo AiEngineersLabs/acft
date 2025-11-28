@@ -1,0 +1,27 @@
+# Virtual env
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build files
+build/
+dist/
+*.egg-info/
+
+# IDE and OS files
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+
+# Env files
+.env
+
+# Security policies
+security_policy.json
