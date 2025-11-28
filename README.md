@@ -1,6 +1,4 @@
-<<<<<<< HEAD
 
-=======
 # 🔥 ACFT — Anti-Hallucination Cognitive Field Theory
 
 ### _A Physics-Based Reasoning Architecture (Beyond Transformers)_
