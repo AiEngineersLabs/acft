@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-
-=======
-
 # 🔥 ACFT — Adative Cognitive Field Theory
 
 ### _A Physics-Based Reasoning Architecture (Beyond Transformers)_
