@@ -5,10 +5,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from typing import Optional
 
 from acft.config.settings import (
-    settings,           # ACFTSettings instance
-    load_acft_settings, # helper to re-read from env if needed
+    settings,            # ACFTSettings instance
+    load_acft_settings,  # helper to re-read from env if needed
 )
 
 from acft.core.engine import (
@@ -22,19 +23,41 @@ from acft.core.engine import (
 from acft.embeddings.ollama_embedder import OllamaEmbedder
 from acft.llm.ollama import OllamaLLM
 
+# SimpleHashEmbedder used ONLY for learned-physics mode
+from acft.neural_operator import SimpleHashEmbedder
+
 # dynamic / JSON-based policy loader
 from acft.security.policy import load_security_policy_from_settings
+
+# learned physics integration
+from acft.physics.learned_integration import build_config_with_learned_physics
 
 
 # -------------------------------------------------
 # Helper: build an ACFTEngine from settings
 # -------------------------------------------------
 
-def build_engine(model_name: str | None = None) -> ACFTEngine:
+def build_engine(
+    model_name: Optional[str] = None,
+    use_learned_physics: bool = False,
+) -> ACFTEngine:
+    """
+    Construct an ACFTEngine wired to Ollama + ACFTConfig.
+
+    Default:
+      - Uses OllamaLLM + OllamaEmbedder (nomic-embed-text)
+      - Uses PDE/topology according to ACFT settings
+      - No learned potential / neural operator
+
+    If use_learned_physics=True:
+      - Wraps the base ACFTConfig with learned potential + neural operator
+        loaded from NPZ files.
+      - Uses SimpleHashEmbedder(dim=64) so φ dimension matches the learned
+        modules (64), avoiding 768 vs 64 shape mismatches.
+    """
     cfg = settings  # ACFTSettings instance
 
     # ---- LLM adapter ----
-    # IMPORTANT: OllamaLLM expects `model_name`, not `model`
     llm = OllamaLLM(
         model_name=model_name or cfg.model_name,
         base_url=cfg.base_url,
@@ -45,18 +68,20 @@ def build_engine(model_name: str | None = None) -> ACFTEngine:
     )
 
     # ---- Embeddings adapter ----
-    embedder = OllamaEmbedder(
-        model=cfg.embed_model,
-        base_url=cfg.embed_base_url,
-    )
+    if use_learned_physics:
+        # IMPORTANT:
+        # Your learned potential & neural operator were trained on 64-dim
+        # vectors, so we must use the same dimensionality here.
+        embedder = SimpleHashEmbedder(dim=64)
+    else:
+        # Default behavior
+        embedder = OllamaEmbedder(
+            model=cfg.embed_model,
+            base_url=cfg.embed_base_url,
+        )
 
     # ---- Security policy resolution ----
     # 1) Try to load from JSON / env / settings via helper
-    #    - respects:
-    #        ACFT_SECURITY_MODE
-    #        ACFT_SECURITY_POLICY_FILE_ENABLE
-    #        ACFT_SECURITY_POLICY_FILE (env override)
-    #        settings.security_policy_filename
     dynamic_policy = load_security_policy_from_settings(cfg)
 
     # 2) Fallback: built-in default policy if security_mode is ON but no file found
@@ -73,8 +98,8 @@ def build_engine(model_name: str | None = None) -> ACFTEngine:
         # security mode disabled -> no policy -> risk_level will be "UNKNOWN"
         security_policy = None
 
-    # ---- ACFT config ----
-    acft_config = ACFTConfig(
+    # ---- Base ACFT config (this matches your current behavior) ----
+    base_config = ACFTConfig(
         thresholds=ACFTThresholds(
             emit_min_stability=cfg.emit_min_stability,
             regen_min_stability=cfg.regen_min_stability,
@@ -92,18 +117,32 @@ def build_engine(model_name: str | None = None) -> ACFTEngine:
             num_steps=cfg.pde_steps,
         ),
         use_topology=cfg.topology_enabled,
-        # advanced stuff (learned potential / neural operator)
+        # learned physics (off by default, same as your previous config)
         use_learned_potential=False,
         learned_potential=None,
         use_neural_operator=False,
         neural_operator=None,
     )
 
+    # ---- Optional: wrap with learned physics heads ----
+    if use_learned_physics:
+        # NOTE: paths + dims must match your training demo
+        config = build_config_with_learned_physics(
+            base_config,
+            potential_path="learned_potential_params.npz",
+            operator_path="neural_operator_params.npz",
+            input_dim=64,   # must match SimpleHashEmbedder dim in examples
+            hidden_dim=64,  # must match training
+        )
+    else:
+        config = base_config
+
+    # ---- Build engine ----
     engine = ACFTEngine(
         llm=llm,
         embedder=embedder,
         retriever=None,  # plug in RAG retriever later
-        config=acft_config,
+        config=config,
     )
     return engine
 
@@ -112,11 +151,25 @@ def build_engine(model_name: str | None = None) -> ACFTEngine:
 # Chat loop
 # -------------------------------------------------
 
-def run_chat(model_name: str | None = None) -> None:
-    engine = build_engine(model_name=model_name)
-    active_model = model_name or settings.model_name
+def run_chat(
+    model_name: Optional[str] = None,
+    use_learned_physics: bool = False,
+) -> None:
+    """
+    Interactive REPL.
 
-    print(f"🚀 ACFT chat started (model: {active_model})")
+    If use_learned_physics=True, the engine uses the learned potential
+    and neural operator loaded from NPZ files (if present).
+    """
+    engine = build_engine(
+        model_name=model_name,
+        use_learned_physics=use_learned_physics,
+    )
+
+    active_model = model_name or settings.model_name
+    physics_suffix = " + learned_physics" if use_learned_physics else ""
+
+    print(f"🚀 ACFT chat started (model: {active_model}{physics_suffix})")
     print("Type 'exit' or 'quit' to stop.\n")
 
     while True:
@@ -137,7 +190,6 @@ def run_chat(model_name: str | None = None) -> None:
 
         print(f"ACFT ({result.decision}): {result.answer}")
         if result.debug_report:
-            # Your requested style: DebugReport: { ... }
             print("DebugReport:", json.dumps(result.debug_report, indent=2))
         print()
 
@@ -149,7 +201,15 @@ def run_chat(model_name: str | None = None) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="acft",
-        description="ACFT CLI – run ACFT guard + chat on top of your local LLM",
+        description="ACFT CLI – physics-based guard + chat on top of your local LLM",
+        epilog=(
+            "Examples:\n"
+            "  acft debug-settings\n"
+            "  acft chat\n"
+            "  acft chat --model llama3.2:latest\n"
+            "  acft chat --use-learned-physics\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -168,23 +228,53 @@ def main() -> int:
         "-m",
         "--model",
         default=settings.model_name,
-        help="LLM model name (default from ACFT_LLAMA_MODEL).",
+        help="LLM model name (default from ACFT_LLAMA_MODEL / ACFT settings).",
+    )
+    p_chat.add_argument(
+        "--use-learned-physics",
+        action="store_true",
+        help=(
+            "Enable learned potential + neural operator from NPZ files "
+            "(learned_potential_params.npz, neural_operator_params.npz)."
+        ),
+    )
+
+    # acft help (pseudo-subcommand)
+    subparsers.add_parser(
+        "help",
+        help="Show this help message and exit.",
     )
 
     args = parser.parse_args()
 
+    # acft help
+    if args.command == "help":
+        # Show main help
+        parser.print_help()
+        # Also show detailed chat help including --use-learned-physics
+        print("\n\nDetailed `acft chat` usage:\n")
+        p_chat.print_help()
+        return 0
+
+    # acft debug-settings
     if args.command == "debug-settings":
         cfg = load_acft_settings()
         print("=== ACFT Debug Settings ===")
         print(cfg.json(indent=2))
         return 0
 
+    # acft chat [--model ...] [--use-learned-physics]
     if args.command == "chat":
-        run_chat(model_name=args.model)
+        run_chat(
+            model_name=args.model,
+            use_learned_physics=getattr(args, "use_learned_physics", False),
+        )
         return 0
 
-    # No subcommand -> show help
+    # No subcommand -> default to help
     parser.print_help()
+    print("\n\nDetailed `acft chat` usage:\n")
+    p_chat.print_help()
     return 0
 
 

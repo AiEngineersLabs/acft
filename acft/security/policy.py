@@ -1,12 +1,17 @@
 # acft/security/policy.py
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 import json
 import os
 from pathlib import Path
+
+if TYPE_CHECKING:
+    # Avoid runtime import cycles; only used for type checking
+    from acft.config.settings import ACFTSettings
 
 
 @dataclass
@@ -78,6 +83,8 @@ def _default_insecure_output_patterns() -> List[str]:
     ]
 
 
+# --------- analysis helpers --------- #
+
 def _analyze_input_security(text_full: str, policy: ACFTSecurityPolicy) -> Dict[str, Any]:
     """
     Analyze the input (prompt + reasoning) for:
@@ -146,6 +153,8 @@ def _analyze_output_security(answer: Optional[str], policy: ACFTSecurityPolicy) 
         "leak_risk": leak_risk,
     }
 
+
+# --------- top-level analysis API --------- #
 
 def analyze_security(
     prompt: str,
@@ -225,7 +234,9 @@ def analyze_security(
 # JSON-based policy loading from settings / env
 # ---------------------------------------------------------
 
-def load_security_policy_from_settings(settings_obj) -> Optional[ACFTSecurityPolicy]:
+def load_security_policy_from_settings(
+    settings_obj: "ACFTSettings",
+) -> Optional[ACFTSecurityPolicy]:
     """
     Given ACFTSettings, try to load a security policy from JSON.
 
@@ -253,7 +264,7 @@ def load_security_policy_from_settings(settings_obj) -> Optional[ACFTSecurityPol
         policy_path = Path(env_path).expanduser()
     else:
         # Default: project root / settings_obj.security_policy_filename
-        # Assume settings module is under acft/config/settings.py, so project root is 3 parents up from this file.
+        # Assume: this file is acft/security/policy.py, so project root is 2 levels up.
         project_root = Path(__file__).resolve().parents[2]
         filename = getattr(settings_obj, "security_policy_filename", "security_policy.json")
         policy_path = project_root / filename
