@@ -1,5 +1,4 @@
-
-# 🔥 ACFT — Anti-Hallucination Cognitive Field Theory
+# 🔥 ACFT — Adative Cognitive Field Theory
 
 ### _A Physics-Based Reasoning Architecture (Beyond Transformers)_
 
@@ -273,9 +272,9 @@ Transformers predict tokens.
 
 ---
 
-# ACFT – Anti-Hallucination Cognitive Field Theory
+# ACFT – Adaptive Cognitive Field Theory
 
-ACFT (Anti-Hallucination Cognitive Field Theory) is a research-grade safety, stability, and reasoning-correction framework designed to wrap around local LLMs such as **Ollama**, **vLLM**, or **HuggingFace models**.
+ACFT (Adaptive Cognitive Field Theory) is a research-grade safety, stability, and reasoning-correction framework designed to wrap around local LLMs such as **Ollama**, **vLLM**, or **HuggingFace models**.
 
 ACFT introduces:
 
@@ -297,7 +296,17 @@ All concepts are implemented in pure Python and Pydantic (v1.x) for maximum port
 
 ## 🚀 Installation
 
+📦 Option 1 — Install ACFT from PyPI
+
 ```bash
+pip install acft
+```
+
+Option 2 — Install Development Version (Local Repo Clone)
+
+```bash
+git clone https://github.com/AiEngineersLabs/acft.git
+cd acft
 pip install -e .
 ```
 
@@ -305,6 +314,12 @@ This installs `acft` as an executable CLI:
 
 ```bash
 acft --help
+```
+
+Option 3 — Install Directly from GitHub
+
+```bash
+pip install "git+https://github.com/AiEngineersLabs/acft.git"
 ```
 
 ---
@@ -368,6 +383,9 @@ acft/
  │    ├── analyzer.py
  │    └── policy.py
  ├── rag/
+ ├── examples/
+ |   ├── train_potential_demo.py        # Train learned potential + neural operator
+ |   ├── load_learned_potential_demo.py # Example of loading learned physics heads
  └── README.md
 ```
 
@@ -412,12 +430,35 @@ source .venv/bin/activate
 acft debug-settings
 ```
 
+### ACFT Help:
+
+```bash
+acft help
+```
+
 ### Start chat:
 
 ```bash
 acft chat
 ```
 
+### Run ACFT with Learned Physics (Neural Operator + Learned Potential)
+
+If you have trained the physics modules (from `examples/train_potential_demo.py`) and generated:
+
+- `learned_potential_params.npz`
+- `neural_operator_params.npz`
+
+You can activate them inside the ACFT engine:
+
+````bash
+acft chat --use-learned-physics
+```
+
+This loads your trained modules and performs:
+	- Learned energy computation
+	- Learned Δφ operator application
+	- Combined PDE + learned evolution
 ---
 
 ## 🔬 Example Debug Report
@@ -435,7 +476,7 @@ Every ACFT run produces metrics like:
     "policy_label": "my_custom_security"
   }
 }
-```
+````
 
 ---
 
@@ -457,4 +498,5 @@ Contributions are welcome.
 ## 📄 License
 
 MIT License.
->>>>>>> 8503289 (Core ACFT physics-based engine release)
+
+> > > > > > > 8503289 (Core ACFT physics-based engine release)

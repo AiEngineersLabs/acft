@@ -7,6 +7,96 @@ import numpy as np
 
 
 # ============================================================
+# Simple utilities for demos / training:
+#   - SimpleHashEmbedder
+#   - SimpleMockLLM
+# ============================================================
+
+@dataclass
+class SimpleHashEmbedder:
+    """
+    Very simple deterministic text → vector mapper, used only for demos.
+
+    It uses Python's hash(text) as a seed to generate a random vector,
+    then normalizes it. This is NOT a real embedding model; it's just
+    for toy training of the potential and neural operator.
+    """
+    dim: int = 64
+
+    def embed(self, text: str) -> np.ndarray:
+        # Stable seed from hash(text)
+        seed = abs(hash(text)) % (2**32)
+        rng = np.random.default_rng(seed)
+
+        v = rng.normal(0.0, 1.0, size=(self.dim,))
+        norm = np.linalg.norm(v) + 1e-8
+        return v / norm
+
+
+class SimpleMockLLM:
+    """
+    Tiny mock "LLM" that returns a few synthetic reasoning steps.
+
+    Used only to generate toy trajectories for training NeuralOperatorMLP:
+        prompt -> step1 -> step2 -> ... -> answer
+    """
+
+    def generate_with_reasoning(self, prompt: str) -> Tuple[List[str], str]:
+        lower = prompt.lower()
+
+        steps: List[str] = []
+
+        # Very crude branching logic just to create different "shapes"
+        if "gravity" in lower and "doesn’t exist" in lower:
+            steps.append("First, consider classical Newtonian gravity.")
+            steps.append("Then, propose a hypothetical world where gravity does not exist.")
+            steps.append("Compare these contradictory assumptions and note the inconsistency.")
+            answer = (
+                "This prompt forces mutually exclusive assumptions, so no consistent answer exists "
+                "without picking one framework and rejecting the other."
+            )
+
+        elif "sun revolves around the earth" in lower:
+            steps.append("First, recall the historical geocentric model.")
+            steps.append("Then, contrast it with the modern heliocentric model.")
+            steps.append("Explain observational evidence that supports heliocentrism.")
+            answer = (
+                "Scientifically, the Earth orbits the Sun. A Sun-revolves-around-Earth model does "
+                "not match the observed data without extreme complexity."
+            )
+
+        elif "zero-day" in lower or "exploit" in lower or "bypass the bank firewall" in lower:
+            steps.append("First, identify that the request is about security bypass / exploit.")
+            steps.append("Recognize that providing such details would be unsafe.")
+            steps.append("Decide to refuse and instead suggest safer alternatives.")
+            answer = (
+                "I cannot provide help with exploits or firewall bypasses. If you have a legitimate "
+                "security concern, follow your organization's responsible disclosure or security process."
+            )
+
+        elif "api key" in lower or "password" in lower or "private key" in lower:
+            steps.append("First, detect that the user is asking for secrets or credentials.")
+            steps.append("Confirm this is sensitive information and must not be exposed.")
+            steps.append("Formulate a refusal with safe guidance.")
+            answer = (
+                "I can't reveal or help retrieve API keys, passwords, or private keys. "
+                "Use your official credential management or support channels instead."
+            )
+
+        else:
+            # "Normal" question case
+            steps.append("Parse the question and identify its main topic.")
+            steps.append("Recall relevant background knowledge or definitions.")
+            steps.append("Construct a concise, coherent explanation.")
+            answer = (
+                "This is a standard informational question. A real LLM would answer with factual "
+                "details, but here we just simulate the reasoning trajectory."
+            )
+
+        return steps, answer
+
+
+# ============================================================
 # Tiny Neural Operator (MLP) for Δφ
 # ============================================================
 
@@ -67,16 +157,15 @@ class NeuralOperatorMLP:
         Returns the scalar loss.
         """
         N, D = batch_phi.shape
-        H = self.hidden_dim
 
         # Forward for batch
         # z1: (N, H) = batch_phi @ W1^T + b1
         z1 = batch_phi @ self.W1.T + self.b1[None, :]
-        h1 = np.tanh(z1)                      # (N, H)
+        h1 = np.tanh(z1)                               # (N, H)
         delta_pred = h1 @ self.W2.T + self.b2[None, :]  # (N, D)
 
         # Loss
-        diff = delta_pred - batch_delta_target           # (N, D)
+        diff = delta_pred - batch_delta_target          # (N, D)
         loss = 0.5 * float(np.mean(np.sum(diff**2, axis=1)))
 
         # Backprop
@@ -85,25 +174,17 @@ class NeuralOperatorMLP:
 
         # For layer 2:
         # delta_pred = h1 @ W2^T + b2
-        # So:
-        # dL/dW2 = d_delta^T @ h1
-        # dL/db2 = sum(d_delta, axis=0)
         dW2 = d_delta.T @ h1                       # (D, H)
         db2 = np.sum(d_delta, axis=0)              # (D,)
 
         # Backprop to h1:
-        # dL/dh1 = d_delta @ W2
         d_h1 = d_delta @ self.W2                   # (N, H)
 
         # Backprop through tanh:
-        # h1 = tanh(z1)  => dh1/dz1 = 1 - tanh^2(z1)
         dh1_dz1 = 1.0 - np.tanh(z1)**2
         d_z1 = d_h1 * dh1_dz1                      # (N, H)
 
         # Layer 1:
-        # z1 = batch_phi @ W1^T + b1
-        # dL/dW1 = d_z1^T @ batch_phi
-        # dL/db1 = sum(d_z1, axis=0)
         dW1 = d_z1.T @ batch_phi                   # (H, D)
         db1 = np.sum(d_z1, axis=0)                 # (H,)
 
@@ -201,11 +282,9 @@ class LearnablePotentialMLP:
 
         where E_i is target energy.
         """
-        N, D = batch_phi.shape
-        H = self.hidden_dim
+        N, _ = batch_phi.shape
 
         # Forward for batch:
-        # z1: (N, H) = batch_phi @ W1^T + b1
         z1 = batch_phi @ self.W1.T + self.b1[None, :]  # (N, H)
         h1 = np.tanh(z1)                                # (N, H)
         V = h1 @ self.w2 + self.b2                      # (N,)
@@ -215,26 +294,20 @@ class LearnablePotentialMLP:
         loss = 0.5 * float(np.mean(diff**2))
 
         # Backprop
-        # dL/dV = (V - E)
         dV = diff / N                                   # (N,)
 
         # V = h1 @ w2 + b2
-        # dL/dw2 = h1^T @ dV
-        # dL/db2 = sum(dV)
         dw2 = h1.T @ dV                                 # (H,)
         db2 = float(np.sum(dV))                         # scalar
 
-        # dL/dh1 = dV[:, None] * w2[None, :]
+        # dL/dh1
         d_h1 = dV[:, None] * self.w2[None, :]           # (N, H)
 
         # h1 = tanh(z1)
-        # dh1/dz1 = 1 - tanh^2(z1)
         dh_dz = 1.0 - np.tanh(z1)**2                    # (N, H)
         d_z1 = d_h1 * dh_dz                             # (N, H)
 
         # z1 = batch_phi @ W1^T + b1
-        # dL/dW1 = d_z1^T @ batch_phi
-        # dL/db1 = sum(d_z1, axis=0)
         dW1 = d_z1.T @ batch_phi                        # (H, D)
         db1 = np.sum(d_z1, axis=0)                      # (H,)
 
@@ -265,7 +338,6 @@ class LearnablePotentialMLP:
         losses: List[float] = []
 
         for epoch in range(epochs):
-            # Simple mini-batch loop
             indices = np.arange(N)
             np.random.shuffle(indices)
 
