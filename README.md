@@ -160,115 +160,18 @@ Transformers predict tokens.
 ---
 
 # Mermaid Architecture Diagram
-
-    flowchart TD
-    U(User Prompt)
-    LLM(LLM Backend: Ollama / vLLM / OpenAI)
-    E(Embedder)
-    CF(Cognitive Field φ(t))
-    V(Potential Function V(φ))
-    H(Topology Operator H(φ))
-    PDE(Neural PDE Evolution ∂φ/∂t)
-    SEC(Security Analyzer)
-    CTRL(ACFT Meta-Controller)
-    OUT(Final Answer)
-
-    U --> LLM
-    U --> E
-    LLM --> CF
-    E --> CF
-
-    CF --> V
-    CF --> H
-    CF --> PDE
-
-    V --> CTRL
-    H --> CTRL
-    PDE --> CTRL
-
-    CTRL --> SEC
-    SEC --> CTRL
-
-    CTRL -->|Emit / Regenerate / Retrieve / Refuse| OUT
+<img width="1027" height="623" alt="image" src="https://github.com/user-attachments/assets/d557433a-6f5b-4c57-8f2e-c97f80f4dff8" />
 
 ---
 
 # Visual Cognitive-Field Flow Diagram
-
-    sequenceDiagram
-    participant U as User
-    participant L as LLM
-    participant F as Cognitive Field φ
-    participant V as Energy V(φ)
-    participant O as Oscillation Detector
-    participant T as Topology Analyzer
-    participant C as ACFT Controller
-    participant R as Response
-
-    U->>L: Prompt
-    L->>F: Reasoning Steps
-    F->>V: Compute Energy + Drift
-    F->>O: Measure Oscillation
-    F->>T: Compute Topology (loops, components)
-    V->>C: Stability Signal
-    O->>C: Oscillation Risk
-    T->>C: Topology Risk
-    C->>L: Regenerate? Retrieve? Refuse?
-    C->>R: Final Answer
+<img width="1687" height="710" alt="image" src="https://github.com/user-attachments/assets/85a36a0e-1c0e-4197-bb2d-4e702650a02e" />
 
 ---
 
 # System Block Diagram
+<img width="1816" height="553" alt="image" src="https://github.com/user-attachments/assets/80a556b4-1d46-4796-9a82-ca5a7da7e508" />
 
-    flowchart LR
-
-    subgraph Input Layer
-        P[Prompt]
-        Ctx[Conversation History]
-        Docs[(RAG Documents)]
-    end
-
-    subgraph LLM Interface
-        LLM[LLM Backend]
-        EMB[Embedder]
-    end
-
-    subgraph ACFT Core
-        CF[Cognitive Field Builder]
-        POT[Potential Function V(φ)]
-        PDE[PDE Evolution]
-        TOPO[Topology Analyzer]
-        OSC[Oscillation Detector]
-        SEC[Security Analyzer]
-        CTRL[Meta-Controller]
-    end
-
-    subgraph Output Layer
-        OUT[Final Answer]
-        DBG[Debug JSON]
-    end
-
-    P --> LLM
-    Ctx --> LLM
-    Docs --> LLM
-    LLM --> CF
-    EMB --> CF
-
-    CF --> POT
-    CF --> PDE
-    CF --> TOPO
-    CF --> OSC
-
-    POT --> CTRL
-    PDE --> CTRL
-    TOPO --> CTRL
-    OSC --> CTRL
-    SEC --> CTRL
-
-    CF --> SEC
-
-    CTRL --> OUT
-    CTRL --> DBG
 
 ---
 
